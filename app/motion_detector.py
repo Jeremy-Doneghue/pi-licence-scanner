@@ -8,6 +8,9 @@ import imutils
 import time
 import cv2
 
+from multiprocessing import Queue
+from threading import Thread
+
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video", help="path to the video file")
@@ -26,7 +29,7 @@ else:
 
 # location to save output must be specified
 if args.get("output", None) is None:
-	print('You must specify output folder for saved images with -a argument')
+	print('You must specify output folder for saved images with -o argument')
 	sys.exit(1)
 else:
 	outputFolder = args["output"]
@@ -38,10 +41,27 @@ updateFrequency = 90
 
 #Define what happens when ctrl+c is pressed
 def signal_handler(signal, frame):
+	queue.put("STOP")
 	camera.release()
 	print("\nExiting")
+	time.sleep(1)
 	sys.exit(0)
 signal.signal(signal.SIGINT, signal_handler)
+
+# Queue stuff
+def processQueueAsync(i, q):
+	while True:
+		if not q.empty():
+			value = q.get()
+			if value == "STOP":
+				print("stopping alpr queue")
+				break
+			print("async: " + value)
+
+queue = Queue()
+worker = Thread(target=processQueueAsync, args=(0, queue,))
+worker.setDaemon = True
+worker.start()
 
 # loop over the frames of the video
 while True:
@@ -87,7 +107,9 @@ while True:
 		maxH = (max(list(map(lambda x: minY + cv2.boundingRect(x)[3], cnts))))
 
 		crop = hires[minY * 4:maxH * 4, minX * 4:maxW * 4] #TODO: get rid of these magic numbers
-		cv2.imwrite(outputFolder + str(frameCount) + '.jpg', crop, [])
+		filename = outputFolder + str(frameCount) + '.jpg'
+		cv2.imwrite(filename, crop, [])
+		queue.put(filename)
 
 	# update reference frame
 	if motionPresent == False and frameCount % updateFrequency == 0:
