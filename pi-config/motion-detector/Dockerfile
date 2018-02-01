@@ -1,4 +1,5 @@
 FROM demosense/raspberrypi3-opencv:latest
-RUN pip install imutils
 COPY . /usr/src/app
-CMD ["python", "/usr/src/app/motion-detector.py"]
+WORKDIR /usr/src/app
+RUN pip install imutils
+CMD ["python", "motion-detector.py"]
